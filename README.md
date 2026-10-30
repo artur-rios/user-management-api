@@ -1,9 +1,3 @@
-> [!NOTE]
-> This is the real, open-source code of user-management-api. Its home is Forgejo, at
-> https://git.techcraftsmen.net/artur-rios/user-management-api; the copy on GitHub is a read-only mirror, for viewing only, and
-> its issues and pull requests are not followed. If you want to contribute, email me at
-> arturdev@duck.com.
-
 ﻿# User Management API
 
 - Web API for managing users, roles, and permissions in a system
@@ -32,3 +26,8 @@
 - [Commands](./docs/commands/commands.md)
 
 *Documentation under construction*
+
+## Contributing
+
+The GitHub repository is a read-only mirror for the real, open-source code of user-management-api. Its home is Forgejo, at
+https://git.techcraftsmen.net/artur-rios/user-management-api. If you want to contribute, e-mail me at arturdev@duck.com.
