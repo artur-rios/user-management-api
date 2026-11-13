@@ -38,11 +38,11 @@ public class HealthService(IDbContextFactory<RelationalDbContext> dbContextFacto
 
     private async Task<bool> RolesCreated()
     {
-       var adminRoleExists = await _dbContext.Roles.AnyAsync(r => r.Id == (int)Roles.Admin && r.Name == "Admin");
-       var regularRoleExists = await _dbContext.Roles.AnyAsync(r => r.Id == (int)Roles.Regular && r.Name == "Regular");
-       var testRoleExists = await _dbContext.Roles.AnyAsync(r => r.Id == (int)Roles.Test && r.Name == "Test");
+        var adminRoleExists = await _dbContext.Roles.AnyAsync(r => r.Id == (int)Roles.Admin && r.Name == "Admin");
+        var regularRoleExists = await _dbContext.Roles.AnyAsync(r => r.Id == (int)Roles.Regular && r.Name == "Regular");
+        var testRoleExists = await _dbContext.Roles.AnyAsync(r => r.Id == (int)Roles.Test && r.Name == "Test");
 
-       return adminRoleExists && regularRoleExists && testRoleExists;
+        return adminRoleExists && regularRoleExists && testRoleExists;
     }
 
     private async Task<bool> InitialAdminUserCreated()

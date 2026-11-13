@@ -22,7 +22,8 @@ public class AuthenticateUserCommandTests
     {
         var command = new AuthenticateUserCommand
         {
-            Email = _dataMock.ActiveEmail, Password = _dataMock.ActivePassword
+            Email = _dataMock.ActiveEmail,
+            Password = _dataMock.ActivePassword
         };
 
         var result = _handler.Handle(command);
@@ -103,7 +104,8 @@ public class AuthenticateUserCommandTests
     {
         var command = new AuthenticateUserCommand
         {
-            Email = DataMock.NonexistentEmail, Password = DataMock.NonexistentPassword
+            Email = DataMock.NonexistentEmail,
+            Password = DataMock.NonexistentPassword
         };
 
         var result = _handler.Handle(command);

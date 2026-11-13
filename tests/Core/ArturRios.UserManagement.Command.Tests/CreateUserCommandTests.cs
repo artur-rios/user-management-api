@@ -67,7 +67,10 @@ public class CreateUserCommandTests
 
         return new CreateUserCommand
         {
-            Name = user.Name, Email = user.Email, Password = userMock.MockPassword, RoleId = user.RoleId
+            Name = user.Name,
+            Email = user.Email,
+            Password = userMock.MockPassword,
+            RoleId = user.RoleId
         };
     }
 }

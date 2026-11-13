@@ -39,9 +39,9 @@ public class User : Entity
         Active = active;
     }
 
-    [Column(Order = 2)] [MaxLength(300)] public string Name { get; set; } = string.Empty;
+    [Column(Order = 2)][MaxLength(300)] public string Name { get; set; } = string.Empty;
 
-    [Column(Order = 3)] [MaxLength(300)] public string Email { get; private set; } = string.Empty;
+    [Column(Order = 3)][MaxLength(300)] public string Email { get; private set; } = string.Empty;
 
     [Column(Order = 4)] public byte[] Password { get; private set; } = [];
 
