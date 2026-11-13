@@ -62,7 +62,8 @@ public class UpdateUserEmailCommandTests
     {
         var command = new UpdateUserEmailCommand
         {
-            UserId = _dataMock.ActiveUserId, Email = _dataMock.ActiveUsers[1].Email
+            UserId = _dataMock.ActiveUserId,
+            Email = _dataMock.ActiveUsers[1].Email
         };
 
         var result = _handler.Handle(command);

@@ -53,7 +53,10 @@ public class UserTests(
 
         var command = new CreateUserCommand
         {
-            Name = user.Name, Email = user.Email, RoleId = user.RoleId, Password = password
+            Name = user.Name,
+            Email = user.Email,
+            RoleId = user.RoleId,
+            Password = password
         };
 
         var result =
@@ -77,7 +80,10 @@ public class UserTests(
 
         var command = new CreateUserCommand
         {
-            Name = user.Name, Email = user.Email, RoleId = user.RoleId, Password = password
+            Name = user.Name,
+            Email = user.Email,
+            RoleId = user.RoleId,
+            Password = password
         };
 
         var result =
@@ -98,7 +104,10 @@ public class UserTests(
 
         var command = new CreateUserCommand
         {
-            Name = user.Name, Email = user.Email, RoleId = user.RoleId, Password = password
+            Name = user.Name,
+            Email = user.Email,
+            RoleId = user.RoleId,
+            Password = password
         };
 
         var result =
