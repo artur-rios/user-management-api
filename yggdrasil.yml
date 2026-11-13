@@ -1,0 +1,23 @@
+# What Jenkins checks for this repository, read by the pipeline of the yggdrasil installation that runs it
+# (yggdrasil's docs/catalog.md, "Repository pipeline file", has every field). It is data, never code: images
+# (pinned by version and digest, which Renovate keeps up to date), commands, globs and the names of Jenkins
+# credentials. The commands are the scripts under ci/, which run from the repository's root, so you can run them on
+# your machine too. Nothing is deployed or released from here: the checks report on every pull request and push.
+# Check it where the catalog is, in the yggdrasil checkout:
+#   python3 scripts/pipeline_config.py describe user-management-api <this repository's checkout>
+#
+# Every project is net8.0 (iac/Dockerfile builds with the 8.0 SDK too), hence the .NET 8 SDK image. Jenkins checks
+# out no submodules: both scripts first fetch `common` (the public artur-rios/common on GitHub, .gitmodules) at the
+# commit this checkout pins, with ci/common.sh.
+
+checks:
+  lint:                                  # dotnet format --verify-no-changes over the solution, common/ excluded: .editorconfig's whitespace and style
+    image: mcr.microsoft.com/dotnet/sdk:8.0.428@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5
+    run: ci/lint.sh
+
+  build:                                 # restore and build the solution (Release), then the Domain unit tests
+    # Left out (ci/build.sh says why): the functional tests (WebApi, WebApi.Client, Data.Client), which need a
+    # PostgreSQL database configured in .env files, and Command.Tests and Query.Tests, whose Argon2
+    # hashing outgrows the memory.
+    image: mcr.microsoft.com/dotnet/sdk:8.0.428@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5
+    run: ci/build.sh
