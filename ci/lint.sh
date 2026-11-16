@@ -4,10 +4,10 @@
 # `common` submodule's projects, which are another repository's code: common/ is excluded, so only this
 # repository's files are checked. The same command without --verify-no-changes applies the fixes.
 #
-# yggdrasil.yml runs it in the pinned .NET 8 SDK image from the repository's root, after ci/common.sh has put the
+# yggdrasil.yml runs it in the pinned .NET 10 SDK image from the repository's root, after ci/common.sh has put the
 # submodule in place (the projects cannot load without it). By hand, from a clone with its git metadata:
 #   docker run --rm -v "$PWD:/src" -w /src <image> sh ci/lint.sh
-# or, with the .NET 8 SDK installed, just `sh ci/lint.sh`.
+# or, with the .NET 10 SDK installed, just `sh ci/lint.sh`.
 set -eu
 
 # The repository's root, wherever this is run from.
