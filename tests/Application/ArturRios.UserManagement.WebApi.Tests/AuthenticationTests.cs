@@ -28,7 +28,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
 
 
     [FunctionalFact]
-    public async Task Should_AuthenticateUser()
+    public async Task GivenAUsersEmailAndPassword_WhenAuthenticating_ThenAValidTokenIsReturned()
     {
         var credentials = CredentialsMock.New
             .WithEmail(_testUser.Email)
@@ -45,7 +45,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_AuthenticateUser_When_PasswordIsIncorrect()
+    public async Task GivenAWrongPassword_WhenAuthenticating_ThenAnswers401()
     {
         var credentials = CredentialsMock.New
             .WithEmail(_testUser.Email)
@@ -61,7 +61,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_AuthenticateUser_When_EmailIsIncorrect()
+    public async Task GivenAnUnknownEmail_WhenAuthenticating_ThenAnswers401()
     {
         var credentials = CredentialsMock.New
             .WithEmail("wrong@mail.com")
@@ -77,7 +77,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_AuthenticateUser_When_CredentialsAreIncorrect()
+    public async Task GivenAnUnknownEmailAndAWrongPassword_WhenAuthenticating_ThenAnswers401()
     {
         var credentials = CredentialsMock.New
             .WithEmail("wrong@mail.com")
@@ -96,7 +96,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     [InlineData("")]
     [InlineData(" ")]
     [InlineData("invalid-email")]
-    public async Task ShouldNot_AuthenticateUser_WhenEmailIsInvalid(string email)
+    public async Task GivenAnInvalidEmail_WhenAuthenticating_ThenAnswers401(string email)
     {
         var credentials = CredentialsMock.New
             .WithEmail(email)
@@ -112,7 +112,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     }
 
     [FunctionalFact]
-    public async Task Should_Not_Authenticate_When_EmailIsNull()
+    public async Task GivenNoEmail_WhenAuthenticating_ThenAnswers400()
     {
         var credentials = CredentialsMock.New
             .WithEmail(null!)
@@ -130,7 +130,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     [FunctionalTheory]
     [InlineData("")]
     [InlineData(" ")]
-    public async Task ShouldNot_AuthenticateUser_When_PasswordIsInvalid(string password)
+    public async Task GivenABlankPassword_WhenAuthenticating_ThenAnswers401(string password)
     {
         var credentials = CredentialsMock.New
             .WithEmail(_testUser.Email)
@@ -146,7 +146,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     }
 
     [FunctionalFact]
-    public async Task Should_Not_Authenticate_When_PasswordIsNull()
+    public async Task GivenNoPassword_WhenAuthenticating_ThenAnswers400()
     {
         var credentials = CredentialsMock.New
             .WithEmail(_testUser.Email)
@@ -165,7 +165,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     [InlineData("", "")]
     [InlineData(" ", "")]
     [InlineData("invalid-email", "")]
-    public async Task Should_Not_AuthenticateUser_When_CredentialsAreInvalid(string email, string password)
+    public async Task GivenInvalidCredentials_WhenAuthenticating_ThenAnswers401(string email, string password)
     {
         var credentials = CredentialsMock.New
             .WithEmail(email)
@@ -181,7 +181,7 @@ public class AuthenticationTests(DatabaseFixture fixture, EnvironmentType enviro
     }
 
     [FunctionalFact]
-    public async Task Should_Not_Authenticate_When_CredentialsAreNull()
+    public async Task GivenNoCredentials_WhenAuthenticating_ThenAnswers400()
     {
         var credentials = CredentialsMock.New
             .WithEmail(null!)

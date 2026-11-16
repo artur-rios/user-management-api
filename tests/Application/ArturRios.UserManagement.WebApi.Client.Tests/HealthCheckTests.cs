@@ -13,7 +13,7 @@ public class HealthCheckTests : WebApiTest<Program>
         _webApiClient = new WebApiClient(Gateway.Client);
 
     [FunctionalFact]
-    public async Task Should_DoHealthCheck()
+    public async Task GivenTheClient_WhenCheckingTheApisHealth_ThenItAnswersHelloWorld()
     {
         var output = await _webApiClient.HealthCheck.HelloWorld();
 

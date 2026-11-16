@@ -7,8 +7,8 @@ public class DataClientTests
 {
     private readonly DataClient _dataClient = new(EnvironmentType.Local);
 
-    [UnitFact]
-    public void Should_ReturnUser()
+    [FunctionalFact]
+    public void GivenTheFirstSeededUser_WhenReadByItsId_ThenItIsReturned()
     {
         var user = _dataClient.UserRepository.GetById(1);
 
