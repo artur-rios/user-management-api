@@ -12,10 +12,10 @@
 # to a PostgreSQL database whose connection string comes from .env files or the environment, and fail at once
 # without one ("Database connection string is not configured"); CI has no such database.
 #
-# yggdrasil.yml runs it in the pinned .NET 8 SDK image from the repository's root, after ci/common.sh has put the
+# yggdrasil.yml runs it in the pinned .NET 10 SDK image from the repository's root, after ci/common.sh has put the
 # submodule in place. By hand, from a clone with its git metadata:
 #   docker run --rm -v "$PWD:/src" -w /src <image> sh ci/build.sh
-# or, with the .NET 8 SDK installed, just `sh ci/build.sh`.
+# or, with the .NET 10 SDK installed, just `sh ci/build.sh`.
 set -eu
 
 # The repository's root, wherever this is run from.
