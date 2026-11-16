@@ -9,7 +9,7 @@
 
 ## Stack
 
-- .NET 8.0 / C# 12
+- .NET 10.0 / C# 14
 - Entity Framework
 
 ## Details
