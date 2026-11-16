@@ -1,4 +1,5 @@
 using ArturRios.Common.Test.Attributes;
+using ArturRios.UserManagement.Domain.Aggregates;
 using ArturRios.UserManagement.Domain.Enums;
 using ArturRios.UserManagement.Test.Mock;
 
@@ -6,133 +7,316 @@ namespace ArturRios.UserManagement.Domain.Tests;
 
 public class UserTests
 {
+    private static User Active(Roles role = Roles.Regular) => UserMock.New.Active().WithRole(role).WithEmail("user@mail.com").Generate();
+
+    private static User Inactive(Roles role = Roles.Regular) => UserMock.New.Inactive().WithRole(role).WithEmail("user@mail.com").Generate();
+
     [UnitFact]
-    public void Should_AllowActivation()
+    public void GivenAnEmailANameAndARole_WhenCreated_ThenTheUserIsActiveAndCreatedNow()
     {
-        var user = UserMock.New.Inactive().Generate();
+        // Given
+        var before = DateTime.UtcNow;
 
-        var canActivate = user.Activate();
+        // When
+        var user = new User("user@mail.com", "Name", (int)Roles.Regular);
 
-        Assert.True(canActivate.Success);
-        Assert.Empty(canActivate.Errors);
+        // Then
+        Assert.Equal("user@mail.com", user.Email);
+        Assert.Equal("Name", user.Name);
+        Assert.Equal((int)Roles.Regular, user.RoleId);
+        Assert.True(user.Active);
+        Assert.InRange(user.CreatedAt, before, DateTime.UtcNow);
+        Assert.Empty(user.Password);
+        Assert.Empty(user.Salt);
     }
 
     [UnitFact]
-    public void ShouldNot_AllowActivation_WhenUserIsAlreadyActive()
+    public void GivenEveryField_WhenCreated_ThenTheUserHoldsThem()
     {
-        var user = UserMock.New.Active().Generate();
+        // Given
+        var createdAt = new DateTime(2024, 5, 1, 12, 0, 0, DateTimeKind.Utc);
 
-        var canActivate = user.Activate();
+        // When
+        var user = new User(7, "user@mail.com", "Name", (int)Roles.Admin, createdAt, active: false);
 
-        Assert.False(canActivate.Success);
-        Assert.NotEmpty(canActivate.Errors);
-        Assert.Equal("User already active", canActivate.Errors.FirstOrDefault());
+        // Then
+        Assert.Equal(7, user.Id);
+        Assert.Equal(createdAt, user.CreatedAt);
+        Assert.False(user.Active);
     }
 
     [UnitFact]
-    public void Should_AllowDeactivation()
+    public void GivenACreationDateAndNoActiveFlag_WhenCreated_ThenTheUserIsActive()
     {
-        var user = UserMock.New.Active().Generate();
+        // When
+        var user = new User("user@mail.com", "Name", (int)Roles.Regular, new DateTime(2024, 5, 1, 0, 0, 0, DateTimeKind.Utc));
 
-        var canDeactivate = user.Deactivate();
-
-        Assert.True(canDeactivate.Success);
-        Assert.Empty(canDeactivate.Errors);
+        // Then
+        Assert.True(user.Active);
     }
 
     [UnitFact]
-    public void ShouldNot_AllowDeactivation_When_UserIsAlreadyInactive()
+    public void GivenAHashAndASalt_WhenSettingThePassword_ThenTheUserHoldsBoth()
     {
-        var user = UserMock.New.Inactive().Generate();
+        // Given
+        var user = Active();
 
-        var canDeactivate = user.Deactivate();
+        // When
+        user.SetPassword([1, 2, 3], [4, 5]);
 
-        Assert.False(canDeactivate.Success);
-        Assert.NotEmpty(canDeactivate.Errors);
-        Assert.Equal("User already inactive", canDeactivate.Errors.FirstOrDefault());
+        // Then
+        Assert.Equal([1, 2, 3], user.Password);
+        Assert.Equal([4, 5], user.Salt);
     }
 
     [UnitFact]
-    public void Should_UpdateRole()
+    public void GivenAnInactiveUser_WhenActivating_ThenItIsActive()
     {
-        var user = UserMock.New.Active().WithRole(Roles.Regular).Generate();
+        // Given
+        var user = Inactive();
 
-        var result = user.UpdateRole((int)Roles.Test);
+        // When
+        var result = user.Activate();
 
+        // Then
+        Assert.True(result.Success);
+        Assert.True(user.Active);
+    }
+
+    [UnitFact]
+    public void GivenAnActiveUser_WhenActivating_ThenItIsRefused()
+    {
+        // Given
+        var user = Active();
+
+        // When
+        var result = user.Activate();
+
+        // Then
+        Assert.Equal(["User already active"], result.Errors);
+        Assert.True(user.Active);
+    }
+
+    [UnitFact]
+    public void GivenAnActiveUser_WhenDeactivating_ThenItIsInactive()
+    {
+        // Given
+        var user = Active();
+
+        // When
+        var result = user.Deactivate();
+
+        // Then
+        Assert.True(result.Success);
+        Assert.False(user.Active);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenDeactivating_ThenItIsRefused()
+    {
+        // Given
+        var user = Inactive();
+
+        // When
+        var result = user.Deactivate();
+
+        // Then
+        Assert.Equal(["User already inactive"], result.Errors);
+        Assert.False(user.Active);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenAskedIfItCanBeDeleted_ThenItCan()
+    {
+        // When
+        var result = Inactive().CanDelete();
+
+        // Then
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
-        Assert.Equal((int)Roles.Test, user.RoleId);
     }
 
     [UnitFact]
-    public void ShouldNot_UpdateRole_When_RoleIsInvalid()
+    public void GivenAnActiveUser_WhenAskedIfItCanBeDeleted_ThenItCannot()
     {
-        var user = UserMock.New.Active().WithRole(Roles.Regular).Generate();
+        // Given
+        var user = Active();
 
-        var result = user.UpdateRole(999);
+        // When
+        var result = user.CanDelete();
 
-        Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("Role should be valid", result.Errors.FirstOrDefault());
+        // Then
+        Assert.Equal(["Can't delete active user"], result.Errors);
+        Assert.True(user.Active);
+    }
+
+    [UnitFact]
+    public void GivenAnActiveUser_WhenRenamed_ThenItHasTheNewName()
+    {
+        // Given
+        var user = Active();
+
+        // When
+        var result = user.Update("New Name");
+
+        // Then
+        Assert.True(result.Success);
+        Assert.Equal("New Name", user.Name);
+    }
+
+    [UnitTheory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GivenAnActiveUser_WhenRenamedToBlank_ThenItIsRefusedAndKeepsItsName(string name)
+    {
+        // Given
+        var user = Active();
+        var previous = user.Name;
+
+        // When
+        var result = user.Update(name);
+
+        // Then
+        Assert.Equal(["Name cannot be empty"], result.Errors);
+        Assert.Equal(previous, user.Name);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenRenamed_ThenItIsRefusedAndKeepsItsName()
+    {
+        // Given
+        var user = Inactive();
+        var previous = user.Name;
+
+        // When
+        var result = user.Update("New Name");
+
+        // Then
+        Assert.Equal(["Can't update inactive user"], result.Errors);
+        Assert.Equal(previous, user.Name);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenRenamedToBlank_ThenBothProblemsAreReported()
+    {
+        // When
+        var result = Inactive().Update(string.Empty);
+
+        // Then
+        Assert.Equivalent(new[] { "Can't update inactive user", "Name cannot be empty" }, result.Errors, strict: true);
+    }
+
+    [UnitFact]
+    public void GivenAnActiveUser_WhenItsEmailChanges_ThenItHasTheNewEmail()
+    {
+        // Given
+        var user = Active();
+
+        // When
+        var result = user.UpdateEmail("new@mail.com");
+
+        // Then
+        Assert.True(result.Success);
+        Assert.Equal("new@mail.com", user.Email);
+    }
+
+    [UnitTheory]
+    [InlineData("", "Email cannot be empty")]
+    [InlineData("  ", "Email cannot be empty")]
+    [InlineData("user@mail.com", "New email must be different from current email")]
+    public void GivenAnActiveUser_WhenItsEmailChangesToAnUnusableOne_ThenItIsRefusedAndKeepsItsEmail(string email, string error)
+    {
+        // Given
+        var user = Active();
+
+        // When
+        var result = user.UpdateEmail(email);
+
+        // Then
+        Assert.Equal([error], result.Errors);
+        Assert.Equal("user@mail.com", user.Email);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenItsEmailChanges_ThenItIsRefusedAndKeepsItsEmail()
+    {
+        // Given
+        var user = Inactive();
+
+        // When
+        var result = user.UpdateEmail("new@mail.com");
+
+        // Then
+        Assert.Equal(["Can't change email of inactive user"], result.Errors);
+        Assert.Equal("user@mail.com", user.Email);
+    }
+
+    [UnitTheory]
+    [InlineData(Roles.Admin)]
+    [InlineData(Roles.Test)]
+    public void GivenAnActiveUser_WhenItsRoleChangesToAnotherRole_ThenItHasTheNewRole(Roles role)
+    {
+        // Given
+        var user = Active(Roles.Regular);
+
+        // When
+        var result = user.UpdateRole((int)role);
+
+        // Then
+        Assert.True(result.Success);
+        Assert.Equal((int)role, user.RoleId);
+    }
+
+    [UnitTheory]
+    [InlineData(0)]
+    [InlineData(999)]
+    public void GivenAnActiveUser_WhenItsRoleChangesToOneThatDoesNotExist_ThenItIsRefusedAndKeepsItsRole(int roleId)
+    {
+        // Given
+        var user = Active(Roles.Regular);
+
+        // When
+        var result = user.UpdateRole(roleId);
+
+        // Then
+        Assert.Equal(["Role should be valid"], result.Errors);
         Assert.Equal((int)Roles.Regular, user.RoleId);
     }
 
     [UnitFact]
-    public void ShouldNot_UpdateRole_When_RoleIsSame()
+    public void GivenAnActiveUser_WhenItsRoleChangesToTheSameRole_ThenItIsRefused()
     {
-        var user = UserMock.New.Active().WithRole(Roles.Regular).Generate();
+        // Given
+        var user = Active(Roles.Regular);
 
+        // When
         var result = user.UpdateRole((int)Roles.Regular);
 
-        Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("New role must be different from current role", result.Errors.FirstOrDefault());
+        // Then
+        Assert.Equal(["New role must be different from current role"], result.Errors);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenItsRoleChanges_ThenItIsRefusedAndKeepsItsRole()
+    {
+        // Given
+        var user = Inactive(Roles.Regular);
+
+        // When
+        var result = user.UpdateRole((int)Roles.Admin);
+
+        // Then
+        Assert.Equal(["Can't change role of inactive user"], result.Errors);
         Assert.Equal((int)Roles.Regular, user.RoleId);
     }
 
     [UnitFact]
-    public void Should_AllowUpdate()
+    public void GivenAnInactiveUser_WhenItsRoleChangesToOneThatDoesNotExist_ThenBothProblemsAreReported()
     {
-        var user = UserMock.New.Active().Generate();
+        // When
+        var result = Inactive().UpdateRole(999);
 
-        var canUpdate = user.Update("New Name");
-
-        Assert.True(canUpdate.Success);
-        Assert.Empty(canUpdate.Errors);
-    }
-
-    [UnitFact]
-    public void ShouldNot_AllowUpdate_When_UserIsInactive()
-    {
-        var user = UserMock.New.Inactive().Generate();
-
-        var canUpdate = user.Update("New Name");
-
-        Assert.False(canUpdate.Success);
-        Assert.NotEmpty(canUpdate.Errors);
-        Assert.Equal("Can't update inactive user", canUpdate.Errors.FirstOrDefault());
-    }
-
-    [UnitFact]
-    public void Should_AllowDeletion()
-    {
-        var user = UserMock.New.Inactive().Generate();
-
-        var canDelete = user.CanDelete();
-
-        Assert.True(canDelete.Success);
-        Assert.Empty(canDelete.Errors);
-    }
-
-    [UnitFact]
-    public void ShouldNot_AllowDeletion_When_UserIsActive()
-    {
-        var user = UserMock.New.Active().Generate();
-
-        var canDelete = user.CanDelete();
-
-        Assert.False(canDelete.Success);
-        Assert.NotEmpty(canDelete.Errors);
-        Assert.Equal("Can't delete active user", canDelete.Errors.FirstOrDefault());
+        // Then
+        Assert.Equivalent(new[] { "Role should be valid", "Can't change role of inactive user" }, result.Errors, strict: true);
     }
 }

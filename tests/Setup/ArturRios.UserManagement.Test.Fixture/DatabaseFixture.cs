@@ -27,7 +27,8 @@ public class DatabaseFixture : IDisposable
 
         for (var i = 0; i < quantity; i++)
         {
-            var userMock = UserMock.New.WithNoId().WithRole(Roles.Test);
+            // The functional tests sign in as these users, through the API's real hashing.
+            var userMock = UserMock.New.WithNoId().WithRole(Roles.Test).WithPasswordHash();
 
             if (!active)
             {

@@ -2,83 +2,100 @@
 using ArturRios.UserManagement.Command.CommandHandlers;
 using ArturRios.UserManagement.Command.Commands;
 using ArturRios.UserManagement.Command.Validators;
+using ArturRios.UserManagement.Domain.Aggregates;
 using ArturRios.UserManagement.Domain.Enums;
+using ArturRios.UserManagement.Domain.Repositories;
 using ArturRios.UserManagement.Test.Mock;
+using Moq;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
 public class UpdateUserRoleCommandTests
 {
     private readonly DataMock _dataMock = DataMock.New.Build();
+    private readonly Mock<IUserRepository> _repository;
     private readonly UpdateUserRoleCommandHandler _handler;
 
     public UpdateUserRoleCommandTests()
     {
-        var userRepository = MockRepositoryFactory.CreatUserRepositoryInstance(_dataMock.AllUsers);
-        _handler = new UpdateUserRoleCommandHandler(new UpdateUserRoleCommandValidator(), userRepository);
+        _repository = MockRepositoryFactory.CreateUserRepositoryMock(_dataMock.AllUsers);
+        _handler = new UpdateUserRoleCommandHandler(new UpdateUserRoleCommandValidator(), _repository.Object);
     }
 
-    [UnitFact]
-    public void Should_UpdateUserRole()
+    [UnitTheory]
+    [InlineData(Roles.Admin)]
+    [InlineData(Roles.Test)]
+    public void GivenAnotherValidRole_WhenChangingAnActiveUsersRole_ThenItIsStored(Roles role)
     {
-        var command = new UpdateUserRoleCommand { UserId = _dataMock.ActiveIds.First(), NewRoleId = (int)Roles.Test };
+        // When
+        var result = _handler.Handle(new UpdateUserRoleCommand { UserId = _dataMock.ActiveIds.First(), NewRoleId = (int)role });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.True(result.Success);
-        Assert.NotNull(result.Data);
-        Assert.Equal(command.NewRoleId, result.Data.UpdatedUserRoleId);
-        Assert.Equal($"User role updated to {command.NewRoleId}", result.Messages.First());
+        Assert.Equal((int)role, result.Data?.UpdatedUserRoleId);
+        Assert.Equal([$"User role updated to {(int)role}"], result.Messages);
+        _repository.Verify(repo => repo.Update(It.Is<User>(user => user.RoleId == (int)role)), Times.Once);
     }
 
     [UnitFact]
-    public void ShouldNot_UpdateUserRole_When_IdIsNotOnDatabase()
+    public void GivenAnIdNotOnTheDatabase_WhenChangingTheRole_ThenTheUserIsNotFound()
     {
-        var command =
-            new UpdateUserRoleCommand { UserId = _dataMock.NonexistentIds.First(), NewRoleId = (int)Roles.Test };
+        // When
+        var result = _handler.Handle(new UpdateUserRoleCommand { UserId = _dataMock.NonexistentIds.First(), NewRoleId = (int)Roles.Test });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("User not found", result.Errors.First());
+        Assert.Equal(["User not found"], result.Errors);
     }
 
     [UnitFact]
-    public void Should_Not_UpdateUserRole_When_UserIsInactive()
+    public void GivenAnInactiveUser_WhenChangingTheRole_ThenItIsRefusedAndNothingIsStored()
     {
-        var command =
-            new UpdateUserRoleCommand { UserId = _dataMock.InactiveIds.First(), NewRoleId = (int)Roles.Test };
+        // When
+        var result = _handler.Handle(new UpdateUserRoleCommand { UserId = _dataMock.InactiveIds.First(), NewRoleId = (int)Roles.Test });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("Can't change role of inactive user", result.Errors.First());
+        Assert.Equal(["Can't change role of inactive user"], result.Errors);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
+    }
+
+    [UnitTheory]
+    [InlineData(0)]
+    [InlineData(4)]
+    [InlineData(999)]
+    public void GivenARoleThatDoesNotExist_WhenChangingTheRole_ThenItIsRefusedAsInvalid(int roleId)
+    {
+        // When
+        var result = _handler.Handle(new UpdateUserRoleCommand { UserId = _dataMock.ActiveIds.First(), NewRoleId = roleId });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Equal(["Role should be valid"], result.Errors);
+        _repository.Verify(repo => repo.GetById(It.IsAny<int>()), Times.Never);
     }
 
     [UnitFact]
-    public void ShouldNot_UpdateUserRole_When_RoleIsInvalid()
+    public void GivenTheUsersOwnRole_WhenChangingTheRole_ThenItMustBeDifferent()
     {
-        var command = new UpdateUserRoleCommand { UserId = _dataMock.ActiveIds.First(), NewRoleId = 999 };
+        // When
+        var result = _handler.Handle(new UpdateUserRoleCommand { UserId = _dataMock.ActiveIds.First(), NewRoleId = (int)Roles.Regular });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("Role should be valid", result.Errors.First());
+        Assert.Equal(["New role must be different from current role"], result.Errors);
     }
 
-    [UnitFact]
-    public void ShouldNot_UpdateUserRole_When_RoleIsSame()
+    [UnitTheory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GivenAnIdBelowOne_WhenChangingTheRole_ThenItIsRefusedAsInvalid(int id)
     {
-        var command =
-            new UpdateUserRoleCommand { UserId = _dataMock.ActiveIds.First(), NewRoleId = (int)Roles.Regular };
+        // When
+        var result = _handler.Handle(new UpdateUserRoleCommand { UserId = id, NewRoleId = (int)Roles.Test });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("New role must be different from current role", result.Errors.FirstOrDefault());
+        Assert.Single(result.Errors);
     }
 }

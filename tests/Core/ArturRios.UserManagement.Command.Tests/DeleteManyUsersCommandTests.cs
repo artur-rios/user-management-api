@@ -2,69 +2,122 @@
 using ArturRios.UserManagement.Command.CommandHandlers;
 using ArturRios.UserManagement.Command.Commands;
 using ArturRios.UserManagement.Command.Validators;
+using ArturRios.UserManagement.Domain.Aggregates;
+using ArturRios.UserManagement.Domain.Repositories;
 using ArturRios.UserManagement.Test.Mock;
-using ArturRios.UserManagement.Test.Util;
+using Moq;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
 public class DeleteManyUsersCommandTests
 {
     private readonly DataMock _dataMock = DataMock.New.Build();
+    private readonly Mock<IUserRepository> _repository;
     private readonly DeleteManyUsersCommandHandler _handler;
 
     public DeleteManyUsersCommandTests()
     {
-        var userRepository = MockRepositoryFactory.CreatUserRepositoryInstance(_dataMock.AllUsers);
-        _handler = new DeleteManyUsersCommandHandler(new DeleteManyUsersCommandValidator(), userRepository);
+        _repository = MockRepositoryFactory.CreateUserRepositoryMock(_dataMock.AllUsers);
+        _handler = new DeleteManyUsersCommandHandler(new DeleteManyUsersCommandValidator(), _repository.Object);
     }
 
     [UnitFact]
-    public void Should_DeleteUsers()
+    public void GivenInactiveUsers_WhenDeletingThem_ThenEachIsDeleted()
     {
-        var command = new DeleteManyUsersCommand { UserIds = _dataMock.InactiveIds };
+        // When
+        var result = _handler.Handle(new DeleteManyUsersCommand { UserIds = _dataMock.InactiveIds });
 
-        var result = _handler.Handle(command);
-
-        Assert.Empty(result.Errors);
+        // Then
         Assert.True(result.Success);
+        Assert.Empty(result.Errors);
+        Assert.NotNull(result.Data);
+        Assert.Equal(_dataMock.InactiveIds, result.Data.DeletedIds);
+        Assert.Empty(result.Data.FailedDeletionIds);
+        Assert.Empty(result.Data.NotFoundIds);
+        _repository.Verify(repo => repo.Delete(It.IsAny<User>()), Times.Exactly(_dataMock.InactiveIds.Count));
     }
 
     [UnitFact]
-    public void ShouldNot_DeleteUsers_When_UsersAreActive()
+    public void GivenActiveUsers_WhenDeletingThem_ThenEachFailureIsReportedAndNoneIsDeleted()
     {
-        var command = new DeleteManyUsersCommand { UserIds = _dataMock.ActiveIds };
+        // Given
+        var ids = _dataMock.ActiveIds;
 
-        var result = _handler.Handle(command);
+        // When
+        var result = _handler.Handle(new DeleteManyUsersCommand { UserIds = ids });
 
+        // Then
         Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal($"Users with IDs {string.Join(", ", _dataMock.ActiveIds)} cannot be deleted",
-            result.Errors.First());
-
-        for (var i = 0; i < _dataMock.ActiveIds.Count; i++)
-        {
-            if (i == 0)
-            {
-                Assert.Equal($"Users with IDs {string.Join(", ", _dataMock.ActiveIds)} cannot be deleted",
-                    result.Errors[i]);
-
-                continue;
-            }
-
-            Assert.Equal($"User with Id {_dataMock.ActiveIds[i]}: Can't delete active user",
-                result.Errors.Skip(1).FirstOrDefault(e => e.ExtractIdFromDomainError() == _dataMock.ActiveIds[i]));
-        }
+        Assert.Equal(
+            [$"Users with IDs {string.Join(", ", ids)} cannot be deleted", .. ids.Select(id => $"User with Id {id}: Can't delete active user")],
+            result.Errors);
+        Assert.Equal(ids, result.Data?.FailedDeletionIds);
+        _repository.Verify(repo => repo.Delete(It.IsAny<User>()), Times.Never);
     }
 
     [UnitFact]
-    public void ShouldNot_DeleteUsers_When_IdsAreNotOnDatabase()
+    public void GivenIdsNotOnTheDatabase_WhenDeletingThem_ThenEachIsReportedAsNotFound()
     {
-        var command = new DeleteManyUsersCommand { UserIds = _dataMock.NonexistentIds };
+        // Given
+        var ids = _dataMock.NonexistentIds;
 
-        var result = _handler.Handle(command);
+        // When
+        var result = _handler.Handle(new DeleteManyUsersCommand { UserIds = ids });
 
+        // Then
         Assert.False(result.Success);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal($"Users with IDs {string.Join(", ", _dataMock.NonexistentIds)} not found", result.Errors.First());
+        Assert.Equal(
+            [$"Users with IDs {string.Join(", ", ids)} not found", .. ids.Select(id => $"User with Id {id} not found")],
+            result.Errors);
+        Assert.Equal(ids, result.Data?.NotFoundIds);
+    }
+
+    [UnitFact]
+    public void GivenSomeUsersThatCanBeDeleted_WhenDeletingThem_ThenTheyAreDeletedAndTheOthersFailTheCommand()
+    {
+        // Given
+        var inactive = _dataMock.InactiveIds.First();
+        var active = _dataMock.ActiveIds.First();
+        var missing = _dataMock.NonexistentIds.First();
+
+        // When
+        var result = _handler.Handle(new DeleteManyUsersCommand { UserIds = [inactive, active, missing] });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Equal(
+            [
+                $"Users with IDs {missing} not found; Users with IDs {active} cannot be deleted",
+                $"User with Id {active}: Can't delete active user",
+                $"User with Id {missing} not found"
+            ],
+            result.Errors);
+        Assert.NotNull(result.Data);
+        Assert.Equal([inactive], result.Data.DeletedIds);
+        _repository.Verify(repo => repo.Delete(It.Is<User>(user => user.Id == inactive)), Times.Once);
+    }
+
+    [UnitFact]
+    public void GivenNoIds_WhenDeleting_ThenItIsRefusedAsInvalid()
+    {
+        // When
+        var result = _handler.Handle(new DeleteManyUsersCommand { UserIds = [] });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Single(result.Errors);
+        Assert.Null(result.Data);
+    }
+
+    [UnitFact]
+    public void GivenAnIdBelowOne_WhenDeleting_ThenItIsRefusedAsInvalid()
+    {
+        // When
+        var result = _handler.Handle(new DeleteManyUsersCommand { UserIds = [_dataMock.InactiveIds.First(), 0] });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Single(result.Errors);
+        _repository.Verify(repo => repo.Delete(It.IsAny<User>()), Times.Never);
     }
 }

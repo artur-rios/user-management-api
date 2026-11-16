@@ -6,112 +6,128 @@ using ArturRios.UserManagement.Test.Mock;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
-public class AuthenticateUserCommandTests
+/// <summary>The users are built once for the class: the one who signs in has a real password hash, which is costly.</summary>
+public sealed class AuthenticationData
 {
-    private readonly DataMock _dataMock = DataMock.New.Build();
-    private readonly AuthenticateUserCommandHandler _handler;
+    public DataMock Data { get; } = DataMock.New.WithHashedActivePassword().Build();
+}
 
-    public AuthenticateUserCommandTests()
-    {
-        var userRepository = MockRepositoryFactory.CreateUserReadOnlyRepositoryInstance(_dataMock.AllUsers);
-        _handler = new AuthenticateUserCommandHandler(new AuthenticateUserCommandValidator(), userRepository);
-    }
+[Collection(PasswordHashingCollection.Name)]
+public class AuthenticateUserCommandTests(AuthenticationData authentication) : IClassFixture<AuthenticationData>
+{
+    private readonly DataMock _dataMock = authentication.Data;
+
+    private AuthenticateUserCommandHandler Handler() => new(
+        new AuthenticateUserCommandValidator(),
+        MockRepositoryFactory.CreateUserReadOnlyRepositoryInstance(_dataMock.AllUsers));
 
     [UnitFact]
-    public void Should_AuthenticateUser()
+    public void GivenTheRightEmailAndPassword_WhenAuthenticating_ThenTheUserAndItsRoleAreReturned()
     {
-        var command = new AuthenticateUserCommand
-        {
-            Email = _dataMock.ActiveEmail,
-            Password = _dataMock.ActivePassword
-        };
+        // Given
+        var command = new AuthenticateUserCommand { Email = _dataMock.ActiveEmail, Password = _dataMock.ActivePassword };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
+        // Then
+        Assert.True(result.Success);
         Assert.NotNull(result.Data);
         Assert.Equal(_dataMock.ActiveUserId, result.Data.Id);
         Assert.Equal(_dataMock.ActiveRoleId, result.Data.RoleId);
-        Assert.Equal("User authenticated successfully", result.Messages.First());
-        Assert.True(result.Success);
+        Assert.Equal(["User authenticated successfully"], result.Messages);
     }
 
     [UnitFact]
-    public void ShouldNot_AuthenticateUser_When_EmailIsInvalid()
+    public void GivenAnEmptyEmail_WhenAuthenticating_ThenItIsRefusedAsInvalid()
     {
+        // Given
         var command = new AuthenticateUserCommand { Email = string.Empty, Password = _dataMock.ActivePassword };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
-        Assert.Null(result.Data);
-        Assert.Equal("Email should be valid", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Email should be valid"], result.Errors);
     }
 
     [UnitFact]
-    public void ShouldNot_AuthenticateUser_When_PasswordIsInvalid()
+    public void GivenAnEmptyPassword_WhenAuthenticating_ThenItIsRefusedAsInvalid()
     {
+        // Given
         var command = new AuthenticateUserCommand { Email = _dataMock.ActiveEmail, Password = string.Empty };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
-        Assert.Null(result.Data);
-        Assert.Equal("Password should be valid", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Password should be valid"], result.Errors);
     }
 
     [UnitFact]
-    public void ShouldNot_AuthenticateUser_When_CredentialsAreInvalid()
+    public void GivenAnEmptyEmailAndPassword_WhenAuthenticating_ThenBothAreReported()
     {
+        // Given
         var command = new AuthenticateUserCommand { Email = string.Empty, Password = string.Empty };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
-        Assert.Null(result.Data);
-        Assert.Equal(2, result.Errors.Count);
-        Assert.Equal("Email should be valid", result.Errors[0]);
-        Assert.Equal("Password should be valid", result.Errors[1]);
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Email should be valid", "Password should be valid"], result.Errors);
     }
 
     [UnitFact]
-    public void ShouldNot_AuthenticateUser_When_EmailIsIncorrect()
+    public void GivenAnUnknownEmail_WhenAuthenticating_ThenTheCredentialsAreInvalid()
     {
-        var command =
-            new AuthenticateUserCommand { Email = DataMock.NonexistentEmail, Password = _dataMock.ActivePassword };
+        // Given
+        var command = new AuthenticateUserCommand { Email = DataMock.NonexistentEmail, Password = _dataMock.ActivePassword };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
-        Assert.Null(result.Data);
-        Assert.Equal("Invalid credentials", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Invalid credentials"], result.Errors);
     }
 
     [UnitFact]
-    public void ShouldNot_AuthenticateUser_When_PasswordIsIncorrect()
+    public void GivenAWrongPassword_WhenAuthenticating_ThenTheCredentialsAreInvalid()
     {
-        var command =
-            new AuthenticateUserCommand { Email = _dataMock.ActiveEmail, Password = DataMock.NonexistentPassword };
+        // Given
+        var command = new AuthenticateUserCommand { Email = _dataMock.ActiveEmail, Password = DataMock.NonexistentPassword };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
-        Assert.Null(result.Data);
-        Assert.Equal("Invalid credentials", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Invalid credentials"], result.Errors);
     }
 
     [UnitFact]
-    public void ShouldNot_AuthenticateUser_When_CredentialsAreIncorrect()
+    public void GivenAnUnknownEmailAndAWrongPassword_WhenAuthenticating_ThenTheCredentialsAreInvalid()
     {
+        // Given
         var command = new AuthenticateUserCommand
         {
             Email = DataMock.NonexistentEmail,
             Password = DataMock.NonexistentPassword
         };
 
-        var result = _handler.Handle(command);
+        // When
+        var result = Handler().Handle(command);
 
-        Assert.Null(result.Data);
-        Assert.Equal("Invalid credentials", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Equal(["Invalid credentials"], result.Errors);
     }
 }

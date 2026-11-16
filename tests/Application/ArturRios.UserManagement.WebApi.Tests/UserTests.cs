@@ -46,7 +46,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_CreateUser()
+    public async Task GivenAValidNewUser_WhenCreating_ThenItIsCreated()
     {
         var user = UserMock.New.WithNoId().WithRole(Roles.Regular).Generate();
         var password = CustomRandom.Text(new RandomStringOptions { Length = Constants.MinimumPasswordLength });
@@ -73,7 +73,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_NotCreateUser_WhenInputIsInvalid()
+    public async Task GivenAnInvalidNewUser_WhenCreating_ThenItIsRefused()
     {
         var user = UserMock.New.WithNoId().WithEmail(string.Empty).WithRole(Roles.Regular).Generate();
         var password = CustomRandom.Text(new RandomStringOptions { Length = Constants.MinimumPasswordLength });
@@ -97,7 +97,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_NotCreateUser_WhenEmailAlreadyRegistered()
+    public async Task GivenAnEmailAlreadyRegistered_WhenCreating_ThenItIsRefused()
     {
         var user = fixture.CreateUsers().First();
         var password = CustomRandom.Text(new RandomStringOptions { Length = Constants.MinimumPasswordLength });
@@ -121,7 +121,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_GetUserById()
+    public async Task GivenAUsersId_WhenGettingTheUser_ThenItIsReturned()
     {
         var result = await Gateway.GetAsync<DataOutput<UserQueryOutput>>($"{UserRoute}/{_testUser.Id}");
 
@@ -141,7 +141,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_GetUserById()
+    public async Task GivenAnIdNotOnTheDatabase_WhenGettingTheUser_ThenNoneIsReturned()
     {
         var nonExistentUserId = fixture.GetUserNextId();
 
@@ -155,7 +155,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_GetUserByEmail()
+    public async Task GivenAUsersEmail_WhenGettingTheUser_ThenItIsReturned()
     {
         var query = $"?Email={_testUser.Email}";
 
@@ -177,7 +177,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_NotGetUserByEmail_When_EmailIsNotOnDatabase()
+    public async Task GivenAnEmailNotOnTheDatabase_WhenGettingTheUser_ThenNoneIsReturned()
     {
         const string email = "nonexistent@mail.com";
 
@@ -191,7 +191,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_GetUsersByFilter()
+    public async Task GivenAFilterSomeUsersMatch_WhenListingUsers_ThenTheyAreReturned()
     {
         var query = $"?Name={_testUser.Name}";
 
@@ -212,7 +212,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_GetUsersByFilter()
+    public async Task GivenAFilterNoUserMatches_WhenListingUsers_ThenNoneIsReturned()
     {
         const string query = "?Name=999999";
 
@@ -225,7 +225,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_UpdateUser()
+    public async Task GivenAnActiveUser_WhenUpdating_ThenItIsUpdated()
     {
         var user = fixture.CreateUsers().First();
         const string updatedName = "Updated name";
@@ -248,7 +248,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_UpdateUser_When_InputIsInvalid()
+    public async Task GivenAnInvalidUpdate_WhenUpdating_ThenItIsRefused()
     {
         var user = fixture.CreateUsers().First();
         user.Name = string.Empty;
@@ -265,7 +265,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_UpdateUser_When_UserIsInactive()
+    public async Task GivenAnInactiveUser_WhenUpdating_ThenItIsRefused()
     {
         var user = fixture.CreateUsers(false).First();
 
@@ -281,7 +281,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_UpdateUser_When_UserDoesNotExist()
+    public async Task GivenAnIdNotOnTheDatabase_WhenUpdating_ThenTheUserIsNotFound()
     {
         var command = new UpdateUserCommand { Id = fixture.GetUserNextId(), Name = "Updated name" };
 
@@ -295,7 +295,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_UpdateUserRole()
+    public async Task GivenAnActiveUser_WhenChangingItsRole_ThenItIsChanged()
     {
         var user = fixture.CreateUsers().First();
 
@@ -318,7 +318,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_UpdateUserRole_When_RoleIsInvalid()
+    public async Task GivenARoleThatDoesNotExist_WhenChangingTheRole_ThenItIsRefused()
     {
         var user = fixture.CreateUsers().First();
 
@@ -340,7 +340,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_UpdateUserRole_When_UserIsInactive()
+    public async Task GivenAnInactiveUser_WhenChangingItsRole_ThenItIsRefused()
     {
         var user = fixture.CreateUsers(false).First();
 
@@ -364,7 +364,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task ShouldNot_UpdateUserRole_When_UserDoesNotExist()
+    public async Task GivenAnIdNotOnTheDatabase_WhenChangingTheRole_ThenTheUserIsNotFound()
     {
         var nonExistentUserId = fixture.GetUserNextId();
         const int newRoleId = (int)Roles.Admin;
@@ -382,7 +382,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_ActivateUser()
+    public async Task GivenAnInactiveUser_WhenActivating_ThenItIsActivated()
     {
         var userId = fixture.CreateUsers(false).First().Id;
 
@@ -396,7 +396,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_NotActivateUser()
+    public async Task GivenAnActiveUser_WhenActivating_ThenItIsRefused()
     {
         var userId = fixture.CreateUsers().First().Id;
 
@@ -410,7 +410,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_ActivateManyUsers()
+    public async Task GivenInactiveUsers_WhenActivatingThem_ThenTheyAreActivated()
     {
         const int quantityToActivate = 3;
         var ids = fixture.CreateUsers(false, quantityToActivate).Select(user => user.Id).ToArray();
@@ -440,7 +440,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_DeactivateUser()
+    public async Task GivenAnActiveUser_WhenDeactivating_ThenItIsDeactivated()
     {
         var userId = fixture.CreateUsers().First().Id;
 
@@ -455,7 +455,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_NotDeactivateUser()
+    public async Task GivenAnInactiveUser_WhenDeactivating_ThenItIsRefused()
     {
         var userId = fixture.CreateUsers(false).First().Id;
 
@@ -470,7 +470,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_DeleteUser()
+    public async Task GivenAnInactiveUser_WhenDeleting_ThenItIsDeleted()
     {
         var userId = fixture.CreateUsers(false).First().Id;
 
@@ -484,7 +484,7 @@ public class UserTests(
     }
 
     [FunctionalFact]
-    public async Task Should_NotDeleteUser()
+    public async Task GivenAnActiveUser_WhenDeleting_ThenItIsRefused()
     {
         var userId = fixture.CreateUsers().First().Id;
 

@@ -11,7 +11,7 @@ public class HealthCheckTests(EnvironmentType environment = EnvironmentType.Loca
     private const string HealthCheckRoute = "/HealthCheck";
 
     [FunctionalFact]
-    public async Task Should_DoHealthCheck()
+    public async Task GivenTheApi_WhenCheckingItsHealth_ThenItAnswersHelloWorld()
     {
         var output = await Gateway.GetAsync<DataOutput<string>>(HealthCheckRoute);
 

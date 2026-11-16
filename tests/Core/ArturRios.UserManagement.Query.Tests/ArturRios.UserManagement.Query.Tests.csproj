@@ -27,9 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\common\src\ArturRios.Common.Test\ArturRios.Common.Test.csproj"/>
-    <ProjectReference Include="..\..\tests\Setup\ArturRios.UserManagement.Test.Mock\ArturRios.UserManagement.Test.Mock.csproj"/>
-    <ProjectReference Include="..\Core\ArturRios.UserManagement.Query\ArturRios.UserManagement.Query.csproj"/>
+    <ProjectReference Include="..\..\..\common\src\ArturRios.Common.Test\ArturRios.Common.Test.csproj"/>
+    <ProjectReference Include="..\..\Setup\ArturRios.UserManagement.Test.Mock\ArturRios.UserManagement.Test.Mock.csproj"/>
+    <ProjectReference Include="..\..\..\src\Core\ArturRios.UserManagement.Query\ArturRios.UserManagement.Query.csproj"/>
   </ItemGroup>
 
 </Project>

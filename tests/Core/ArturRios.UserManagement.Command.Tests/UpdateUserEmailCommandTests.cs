@@ -2,88 +2,118 @@
 using ArturRios.UserManagement.Command.CommandHandlers;
 using ArturRios.UserManagement.Command.Commands;
 using ArturRios.UserManagement.Command.Validators;
+using ArturRios.UserManagement.Domain.Aggregates;
+using ArturRios.UserManagement.Domain.Repositories;
 using ArturRios.UserManagement.Test.Mock;
+using Moq;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
 public class UpdateUserEmailCommandTests
 {
+    private const string NewEmail = "updated@mail.com";
+
     private readonly DataMock _dataMock = DataMock.New.Build();
+    private readonly Mock<IUserRepository> _repository;
     private readonly UpdateUserEmailCommandHandler _handler;
 
     public UpdateUserEmailCommandTests()
     {
-        var userRepository = MockRepositoryFactory.CreatUserRepositoryInstance(_dataMock.AllUsers);
-        _handler = new UpdateUserEmailCommandHandler(new UpdateUserEmailCommandValidator(), userRepository);
+        _repository = MockRepositoryFactory.CreateUserRepositoryMock(_dataMock.AllUsers);
+        _handler = new UpdateUserEmailCommandHandler(new UpdateUserEmailCommandValidator(), _repository.Object);
     }
 
     [UnitFact]
-    public void Should_UpdateUserEmail()
+    public void GivenAFreeEmail_WhenChangingAnActiveUsersEmail_ThenItIsStored()
     {
-        var command = new UpdateUserEmailCommand { UserId = _dataMock.ActiveUserId, Email = "updated@mail.com" };
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand { UserId = _dataMock.ActiveUserId, Email = NewEmail });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.True(result.Success);
-        Assert.NotNull(result.Data);
-        Assert.Equal(command.Email, result.Data.UpdatedEmail);
-        Assert.Equal($"User e-mail updated to {command.Email}", result.Messages.First());
+        Assert.Equal(NewEmail, result.Data?.UpdatedEmail);
+        Assert.Equal([$"User e-mail updated to {NewEmail}"], result.Messages);
+        _repository.Verify(repo => repo.Update(It.Is<User>(user => user.Email == NewEmail)), Times.Once);
     }
 
-    [UnitFact]
-    public void Should_Not_UpdateUserEmail_WhenEmailIsInvalid()
+    [UnitTheory]
+    [InlineData("")]
+    [InlineData("not-an-email")]
+    public void GivenAnInvalidEmail_WhenChangingIt_ThenItIsRefusedAsInvalid(string email)
     {
-        var command = new UpdateUserEmailCommand { UserId = _dataMock.ActiveUserId, Email = string.Empty };
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand { UserId = _dataMock.ActiveUserId, Email = email });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
         Assert.Null(result.Data);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("Email should be valid", result.Errors.First());
+        Assert.Equal(["Email should be valid"], result.Errors);
     }
 
     [UnitFact]
-    public void Should_Not_UpdateUserEmail_WhenIdIsNotOnDatabase()
+    public void GivenAnIdNotOnTheDatabase_WhenChangingTheEmail_ThenTheUserIsNotFound()
     {
-        var command =
-            new UpdateUserEmailCommand { UserId = _dataMock.NonexistentIds.First(), Email = "updated@mail.com" };
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand { UserId = _dataMock.NonexistentIds.First(), Email = NewEmail });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
         Assert.Null(result.Data);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("User not found", result.Errors.First());
+        Assert.Equal(["User not found"], result.Errors);
     }
 
     [UnitFact]
-    public void Should_Not_UpdateUserEmail_WhenEmailIsAlreadyInUse()
+    public void GivenAnEmailAnotherUserHas_WhenChangingTheEmail_ThenItIsRefusedAsInUse()
     {
-        var command = new UpdateUserEmailCommand
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand
         {
             UserId = _dataMock.ActiveUserId,
             Email = _dataMock.ActiveUsers[1].Email
-        };
+        });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
         Assert.Null(result.Data);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("Email is already in use", result.Errors.FirstOrDefault());
+        Assert.Equal(["Email is already in use"], result.Errors);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
     }
 
     [UnitFact]
-    public void Should_Not_UpdateUserEmail_WhenEmailIsSame()
+    public void GivenTheUsersOwnEmail_WhenChangingTheEmail_ThenItMustBeDifferent()
     {
-        var command = new UpdateUserEmailCommand { UserId = _dataMock.ActiveUserId, Email = _dataMock.ActiveEmail };
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand { UserId = _dataMock.ActiveUserId, Email = _dataMock.ActiveEmail });
 
-        var result = _handler.Handle(command);
-
+        // Then
         Assert.False(result.Success);
         Assert.Null(result.Data);
-        Assert.NotEmpty(result.Errors);
-        Assert.Equal("New email must be different from current email", result.Errors.FirstOrDefault());
+        Assert.Equal(["New email must be different from current email"], result.Errors);
+    }
+
+    [UnitFact]
+    public void GivenAnInactiveUser_WhenChangingTheEmail_ThenItIsRefusedAndNothingIsStored()
+    {
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand { UserId = _dataMock.InactiveIds.First(), Email = NewEmail });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Equal(["Can't change email of inactive user"], result.Errors);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
+    }
+
+    [UnitTheory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GivenAnIdBelowOne_WhenChangingTheEmail_ThenItIsRefusedAsInvalid(int id)
+    {
+        // When
+        var result = _handler.Handle(new UpdateUserEmailCommand { UserId = id, Email = NewEmail });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Single(result.Errors);
+        _repository.Verify(repo => repo.GetById(It.IsAny<int>()), Times.Never);
     }
 }
