@@ -35,7 +35,10 @@ public class MockRepositoryFactory
         return repository.Object;
     }
 
-    public static IUserRepository CreatUserRepositoryInstance(List<User> users)
+    public static IUserRepository CreateUserRepositoryInstance(List<User> users) => CreateUserRepositoryMock(users).Object;
+
+    /// <summary>The repository as a mock, so a test can verify what was written through it.</summary>
+    public static Mock<IUserRepository> CreateUserRepositoryMock(List<User> users)
     {
         Mock<IUserRepository> repository = new();
 
@@ -57,6 +60,6 @@ public class MockRepositoryFactory
         repository.Setup(repo => repo.Delete(It.IsAny<User>()))
             .Returns((User user) => user.Id);
 
-        return repository.Object;
+        return repository;
     }
 }

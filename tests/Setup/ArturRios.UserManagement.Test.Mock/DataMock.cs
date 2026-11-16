@@ -18,6 +18,7 @@ public class DataMock
     public readonly List<int> InactiveIds = [];
     public readonly List<int> NonexistentIds = [];
     private int _activeUserCount = 5;
+    private bool _hashActivePassword;
     private int _inactiveUserCount = 5;
 
     private List<int> AllIds => ActiveIds.Concat(InactiveIds).ToList();
@@ -30,6 +31,10 @@ public class DataMock
 
     public string ActiveEmail => ActiveUsers.First().Email;
 
+    /// <summary>
+    /// The first active user's password. It matches the stored hash only when the data was built
+    /// <see cref="WithHashedActivePassword"/>.
+    /// </summary>
     public string ActivePassword => _generatedPasswords[ActiveUsers.First().Id];
 
     public int ActiveRoleId => ActiveUsers.First().RoleId;
@@ -51,6 +56,14 @@ public class DataMock
     public DataMock WithActiveUsers(int count)
     {
         _activeUserCount = count;
+
+        return this;
+    }
+
+    /// <summary>Gives the first active user the real hash of <see cref="ActivePassword"/>, and no one else.</summary>
+    public DataMock WithHashedActivePassword()
+    {
+        _hashActivePassword = true;
 
         return this;
     }
@@ -98,6 +111,11 @@ public class DataMock
         {
             var mock = UserMock.New.WithId(id).WithEmail($"active{id}{TestEmailSuffix}").WithRole(Roles.Regular)
                 .Active();
+
+            if (_hashActivePassword && id == ActiveIds.First())
+            {
+                mock.WithPasswordHash();
+            }
 
             _generatedPasswords.Add(id, mock.MockPassword);
 

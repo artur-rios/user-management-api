@@ -2,81 +2,84 @@
 using ArturRios.UserManagement.Command.CommandHandlers;
 using ArturRios.UserManagement.Command.Commands;
 using ArturRios.UserManagement.Command.Validators;
+using ArturRios.UserManagement.Domain.Aggregates;
+using ArturRios.UserManagement.Domain.Repositories;
 using ArturRios.UserManagement.Test.Mock;
+using Moq;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
 public class UpdateUserCommandTests
 {
     private readonly DataMock _dataMock = DataMock.New.Build();
+    private readonly Mock<IUserRepository> _repository;
     private readonly UpdateUserCommandHandler _handler;
 
     public UpdateUserCommandTests()
     {
-        var userRepository = MockRepositoryFactory.CreatUserRepositoryInstance(_dataMock.AllUsers);
-        _handler = new UpdateUserCommandHandler(new UpdateUserCommandValidator(), userRepository);
+        _repository = MockRepositoryFactory.CreateUserRepositoryMock(_dataMock.AllUsers);
+        _handler = new UpdateUserCommandHandler(new UpdateUserCommandValidator(), _repository.Object);
     }
 
     [UnitFact]
-    public void Should_UpdateUser()
+    public void GivenAnActiveUser_WhenRenaming_ThenItIsStoredAndReturnedWithTheNewName()
     {
-        var mock = UserMock.New.WithId(_dataMock.ActiveIds.First());
+        // Given
+        var user = _dataMock.ActiveUsers.First();
 
-        var command = GenerateCommand(mock);
+        // When
+        var result = _handler.Handle(new UpdateUserCommand { Id = user.Id, Name = "New Name" });
 
-        var result = _handler.Handle(command);
-
-        Assert.NotNull(result.Data);
-        Assert.Equal("User updated with success", result.Messages.First());
+        // Then
         Assert.True(result.Success);
+        Assert.Equal(["User updated with success"], result.Messages);
+        Assert.NotNull(result.Data);
+        Assert.Equal(user.Id, result.Data.Id);
+        Assert.Equal("New Name", result.Data.Name);
+        Assert.Equal(user.Email, result.Data.Email);
+        Assert.Equal(user.RoleId, result.Data.RoleId);
+        Assert.Equal(user.CreatedAt, result.Data.CreatedAt);
+        Assert.True(result.Data.Active);
+        _repository.Verify(repo => repo.Update(It.Is<User>(stored => stored.Name == "New Name")), Times.Once);
+    }
+
+    [UnitTheory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GivenABlankName_WhenRenaming_ThenItIsRefusedAsInvalid(string name)
+    {
+        // When
+        var result = _handler.Handle(new UpdateUserCommand { Id = _dataMock.ActiveIds.First(), Name = name });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Name should be valid"], result.Errors);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
     }
 
     [UnitFact]
-    public void ShouldNot_UpdateUser_When_CommandIsInvalid()
+    public void GivenAnInactiveUser_WhenRenaming_ThenItIsRefusedAndNothingIsStored()
     {
-        var mock = UserMock.New.WithId(_dataMock.ActiveIds.First()).WithName(string.Empty);
+        // When
+        var result = _handler.Handle(new UpdateUserCommand { Id = _dataMock.InactiveIds.First(), Name = "New Name" });
 
-        var command = GenerateCommand(mock);
-
-        var result = _handler.Handle(command);
-
-        Assert.Null(result.Data);
-        Assert.Equal("Name should be valid", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Can't update inactive user"], result.Errors);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
     }
 
     [UnitFact]
-    public void Should_NotUpdateUser_When_UserIsInactive()
+    public void GivenAnIdNotOnTheDatabase_WhenRenaming_ThenTheUserIsNotFound()
     {
-        var mock = UserMock.New.WithId(_dataMock.InactiveIds.First()).Inactive();
+        // When
+        var result = _handler.Handle(new UpdateUserCommand { Id = _dataMock.NonexistentIds.First(), Name = "New Name" });
 
-        var command = GenerateCommand(mock);
-
-        var result = _handler.Handle(command);
-
-        Assert.Null(result.Data);
-        Assert.Equal("Can't update inactive user", result.Errors.First());
+        // Then
         Assert.False(result.Success);
-    }
-
-    [UnitFact]
-    public void Should_NotUpdateUser_When_IdIsNotOnDatabase()
-    {
-        var mock = UserMock.New.WithId(_dataMock.NonexistentIds.First());
-
-        var command = GenerateCommand(mock);
-
-        var result = _handler.Handle(command);
-
         Assert.Null(result.Data);
-        Assert.Equal("User not found", result.Errors.First());
-        Assert.False(result.Success);
-    }
-
-    private static UpdateUserCommand GenerateCommand(UserMock userMock)
-    {
-        var user = userMock.Generate();
-
-        return new UpdateUserCommand { Id = user.Id, Name = user.Name };
+        Assert.Equal(["User not found"], result.Errors);
     }
 }

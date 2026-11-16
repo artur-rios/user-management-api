@@ -2,51 +2,76 @@
 using ArturRios.UserManagement.Command.CommandHandlers;
 using ArturRios.UserManagement.Command.Commands;
 using ArturRios.UserManagement.Command.Validators;
+using ArturRios.UserManagement.Domain.Aggregates;
+using ArturRios.UserManagement.Domain.Repositories;
 using ArturRios.UserManagement.Test.Mock;
+using Moq;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
 public class ActivateUserCommandTests
 {
     private readonly DataMock _dataMock = DataMock.New.Build();
+    private readonly Mock<IUserRepository> _repository;
     private readonly ActivateUserCommandHandler _handler;
 
     public ActivateUserCommandTests()
     {
-        var userRepository = MockRepositoryFactory.CreatUserRepositoryInstance(_dataMock.AllUsers);
-        _handler = new ActivateUserCommandHandler(new ActivateUserCommandValidator(), userRepository);
+        _repository = MockRepositoryFactory.CreateUserRepositoryMock(_dataMock.AllUsers);
+        _handler = new ActivateUserCommandHandler(new ActivateUserCommandValidator(), _repository.Object);
     }
 
     [UnitFact]
-    public void Should_ActivateUser()
+    public void GivenAnInactiveUser_WhenActivating_ThenItIsActivatedAndStored()
     {
-        var command = new ActivateUserCommand { UserId = _dataMock.InactiveIds.First() };
+        // Given
+        var id = _dataMock.InactiveIds.First();
 
-        var result = _handler.Handle(command);
+        // When
+        var result = _handler.Handle(new ActivateUserCommand { UserId = id });
 
-        Assert.Empty(result.Errors);
+        // Then
         Assert.True(result.Success);
+        Assert.Equal(["User activated successfully"], result.Messages);
+        _repository.Verify(repo => repo.Update(It.Is<User>(user => user.Id == id && user.Active)), Times.Once);
     }
 
     [UnitFact]
-    public void ShouldNot_ActivateUser_When_IdIsNotOnDatabase()
+    public void GivenAnIdNotOnTheDatabase_WhenActivating_ThenTheUserIsNotFound()
     {
-        var command = new ActivateUserCommand { UserId = _dataMock.NonexistentIds.First() };
+        // When
+        var result = _handler.Handle(new ActivateUserCommand { UserId = _dataMock.NonexistentIds.First() });
 
-        var result = _handler.Handle(command);
-
-        Assert.Equal("User not found", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Equal(["User not found"], result.Errors);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
     }
 
     [UnitFact]
-    public void ShouldNot_ActivateUser_When_UserIsAlreadyActive()
+    public void GivenAnActiveUser_WhenActivating_ThenItIsRefusedAndNothingIsStored()
     {
-        var command = new ActivateUserCommand { UserId = _dataMock.ActiveIds.First() };
+        // When
+        var result = _handler.Handle(new ActivateUserCommand { UserId = _dataMock.ActiveIds.First() });
 
-        var result = _handler.Handle(command);
-
-        Assert.Equal("User already active", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Equal(["User already active"], result.Errors);
+        Assert.Empty(result.Messages);
+        _repository.Verify(repo => repo.Update(It.IsAny<User>()), Times.Never);
+    }
+
+    [UnitTheory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GivenAnIdBelowOne_WhenActivating_ThenItIsRefusedBeforeLookingTheUserUp(int id)
+    {
+        // When
+        var result = _handler.Handle(new ActivateUserCommand { UserId = id });
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Single(result.Errors);
+        _repository.Verify(repo => repo.GetById(It.IsAny<int>()), Times.Never);
     }
 }

@@ -1,76 +1,119 @@
 using ArturRios.Common.Test.Attributes;
+using ArturRios.Common.Util.Hashing;
 using ArturRios.UserManagement.Command.CommandHandlers;
 using ArturRios.UserManagement.Command.Commands;
 using ArturRios.UserManagement.Command.Validators;
+using ArturRios.UserManagement.Domain.Aggregates;
 using ArturRios.UserManagement.Domain.Enums;
+using ArturRios.UserManagement.Domain.Repositories;
 using ArturRios.UserManagement.Test.Mock;
+using Moq;
 
 namespace ArturRios.UserManagement.Command.Tests;
 
+[Collection(PasswordHashingCollection.Name)]
 public class CreateUserCommandTests
 {
+    private const string Password = "Valid1Password";
+
     private readonly DataMock _dataMock = DataMock.New.Build();
-    private readonly CreateUserCommandHandler _handler;
 
-    public CreateUserCommandTests()
+    private CreateUserCommandHandler Handler(IUserRepository? repository = null) => new(
+        new CreateUserCommandValidator(),
+        repository ?? MockRepositoryFactory.CreateUserRepositoryInstance(_dataMock.AllUsers));
+
+    private static CreateUserCommand Command(string email = "new.user@mail.com") => new()
     {
-        var userRepository = MockRepositoryFactory.CreatUserRepositoryInstance(_dataMock.AllUsers);
-        _handler = new CreateUserCommandHandler(new CreateUserCommandValidator(), userRepository);
-    }
+        Name = "New User",
+        Email = email,
+        Password = Password,
+        RoleId = (int)Roles.Regular
+    };
 
     [UnitFact]
-    public void Should_CreateUser()
+    public void GivenAValidNewUser_WhenCreating_ThenItIsStoredWithAHashOfItsPassword()
     {
-        var mock = UserMock.New.WithRole(Roles.Regular);
+        // Given
+        User? stored = null;
+        var repository = new Mock<IUserRepository>();
+        repository.Setup(repo => repo.GetAll()).Returns(_dataMock.AllUsers.AsQueryable());
+        repository.Setup(repo => repo.Create(It.IsAny<User>())).Callback<User>(user => stored = user).Returns(42);
 
-        var command = GenerateCommand(mock);
+        // When
+        var result = Handler(repository.Object).Handle(Command());
 
-        var result = _handler.Handle(command);
-
-        Assert.NotNull(result.Data);
-        Assert.True(result.Data.CreatedUserId > 0);
-        Assert.Equal("User created successfully", result.Messages.First());
+        // Then
         Assert.True(result.Success);
+        Assert.Equal(42, result.Data?.CreatedUserId);
+        Assert.Equal(["User created successfully"], result.Messages);
+        Assert.NotNull(stored);
+        Assert.Equal("New User", stored.Name);
+        Assert.Equal("new.user@mail.com", stored.Email);
+        Assert.Equal((int)Roles.Regular, stored.RoleId);
+        Assert.True(stored.Active);
+        Assert.True(Hash.NewFromBytes(stored.Password, stored.Salt).TextMatches(Password));
     }
 
     [UnitFact]
-    public void ShouldNot_CreateUser_When_UserDtoIsInvalid()
+    public void GivenAnInvalidEmail_WhenCreating_ThenNothingIsStored()
     {
-        var mock = UserMock.New.WithEmail("");
+        // Given
+        var repository = new Mock<IUserRepository>();
 
-        var command = GenerateCommand(mock);
+        // When
+        var result = Handler(repository.Object).Handle(Command(email: string.Empty));
 
-        var result = _handler.Handle(command);
-
-        Assert.Null(result.Data);
-        Assert.Equal("Email should be valid", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["Email should be valid"], result.Errors);
+        repository.Verify(repo => repo.Create(It.IsAny<User>()), Times.Never);
     }
 
     [UnitFact]
-    public void ShouldNot_CreateUser_When_EmailIsAlreadyRegistered()
+    public void GivenAnEmailAlreadyRegistered_WhenCreating_ThenItIsRefusedAndNothingIsStored()
     {
-        var mock = UserMock.New.WithEmail(_dataMock.ActiveEmail);
+        // Given
+        var repository = new Mock<IUserRepository>();
+        repository.Setup(repo => repo.GetAll()).Returns(_dataMock.AllUsers.AsQueryable());
 
-        var command = GenerateCommand(mock);
+        // When
+        var result = Handler(repository.Object).Handle(Command(email: _dataMock.ActiveEmail));
 
-        var result = _handler.Handle(command);
-
-        Assert.Null(result.Data);
-        Assert.Equal("E-mail already registered", result.Errors.First());
+        // Then
         Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Equal(["E-mail already registered"], result.Errors);
+        repository.Verify(repo => repo.Create(It.IsAny<User>()), Times.Never);
     }
 
-    private static CreateUserCommand GenerateCommand(UserMock userMock)
+    [UnitFact]
+    public void GivenAnEmailOfAnInactiveUser_WhenCreating_ThenItIsStillRefused()
     {
-        var user = userMock.Generate();
+        // Given
+        var inactive = _dataMock.AllUsers.First(user => !user.Active);
 
-        return new CreateUserCommand
-        {
-            Name = user.Name,
-            Email = user.Email,
-            Password = userMock.MockPassword,
-            RoleId = user.RoleId
-        };
+        // When
+        var result = Handler().Handle(Command(email: inactive.Email));
+
+        // Then
+        Assert.Equal(["E-mail already registered"], result.Errors);
+    }
+
+    [UnitFact]
+    public void GivenEveryFieldInvalid_WhenCreating_ThenEachIsReported()
+    {
+        // Given
+        var command = new CreateUserCommand { Name = string.Empty, Email = "not-an-email", Password = "short", RoleId = 0 };
+
+        // When
+        var result = Handler().Handle(command);
+
+        // Then
+        Assert.False(result.Success);
+        Assert.Equal(4, result.Errors.Count);
+        Assert.Contains("Email should be valid", result.Errors);
+        Assert.Contains("Password must contain at least 8 characters, a number, a lower char and an upper char", result.Errors);
+        Assert.Contains("Role should be valid", result.Errors);
     }
 }
